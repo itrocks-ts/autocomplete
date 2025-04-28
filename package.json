@@ -1,0 +1,42 @@
+{
+	"author": {
+		"name": "Baptiste Pillot",
+		"email": "baptiste@pillot.fr"
+	},
+	"description": "Editable combobox component featuring smart autocomplete from a list of id-caption pairs for it.rocks",
+	"devDependencies": {
+		"@types/node": "^22.9",
+		"typescript": "5.6"
+	},
+	"files": [
+		"LICENSE",
+		"README.md",
+		"*.d.ts",
+		"*.js"
+	],
+	"homepage": "https://it.rocks",
+	"keywords": [
+		"auto",
+		"autocomplete",
+		"box",
+		"combo",
+		"combobox",
+		"complete",
+		"front-end",
+		"input",
+		"it.rocks"
+	],
+	"license": "ISC",
+	"module": "./autocomplete.js",
+	"name": "@itrocks/autocomplete",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/itrocks-ts/autocomplete.git"
+	},
+	"scripts": {
+		"build": "tsc"
+	},
+	"type": "module",
+	"types": "./autocomplete.d.ts",
+	"version": "0.0.1"
+}
