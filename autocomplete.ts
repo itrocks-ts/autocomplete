@@ -1,62 +1,78 @@
 
-interface HTMLAutoCompleteInputElement extends HTMLInputElement
+interface Item
 {
-	lastValue:      string
-	selectedValue?: string
+	caption: string
+	id:      number
 }
 
 export class AutoComplete
 {
 
-	idInput?: HTMLInputElement
-
-	input: HTMLAutoCompleteInputElement
-
+	idInput?:    HTMLInputElement
+	input:       HTMLInputElement
+	lastKey    = ''
 	suggestions: Suggestions
 
 	constructor(input: HTMLInputElement)
 	{
-		this.input       = Object.assign(input, { lastValue: input.value })
+		this.input      = this.initInput(input)
+		this.idInput    = this.initIdInput()
 		this.suggestions = new Suggestions(this)
-		this.autoIdInput()
 
 		input.addEventListener('blur',    event => this.onBlur(event))
 		input.addEventListener('keydown', event => this.onKeyDown(event))
 		input.addEventListener('input',   event => this.onInput(event))
 	}
 
-	autoIdInput()
+	autoComplete()
 	{
-		const input  = this.input
-		const next   = input.nextElementSibling
-		const prev   = input.previousElementSibling
-		this.idInput
-			= ((next instanceof HTMLInputElement) && (next.type === 'hidden')) ? next
-			: ((prev instanceof HTMLInputElement) && (prev.type === 'hidden')) ? prev
-			: undefined
+		const input = this.input
+		if (input.selectionStart !== input.value.length) {
+			return
+		}
+		const suggestion = this.suggestions.selected()
+		if (!suggestion) {
+			return
+		}
+		const caption  = suggestion.caption
+		const position = input.value.length
+		if (position >= caption.length) {
+			return
+		}
+		input.setRangeText(caption.slice(position))
+		input.setSelectionRange(position, input.value.length)
 	}
 
-	emptyClass()
+	autoEmptyClass()
 	{
 		const input     = this.input
 		const classList = input.classList
-		if (!input.value.length) {
+		if (input.value === '') {
 			classList.add('empty')
-			delete input.selectedValue
-			if (this.idInput) this.idInput.value = ''
 			return
 		}
-		if (classList.contains('empty')) {
-			(classList.length > 1)
-				? classList.remove('empty')
-				: input.removeAttribute('class')
+		classList.remove('empty')
+		if (!classList.length) {
+			input.removeAttribute('class')
 		}
+	}
+
+	autoIdInputValue()
+	{
+		const idInput = this.idInput
+		if (!idInput) return
+		const input = this.input
+		const suggestion = this.suggestions.selected()
+		idInput.value = (input.value === suggestion?.caption)
+			? '' + suggestion.id
+			: ''
 	}
 
 	fetch()
 	{
 		const input     = this.input
 		const dataFetch = input.dataset.fetch ?? input.closest<HTMLElement>('[data-fetch]')?.dataset.fetch
+		const lastKey   = this.lastKey
 		const requestInit: RequestInit = { headers: { Accept: 'application/json' } }
 		const summaryRoute = dataFetch + '?startsWith=' + input.value
 		fetch(summaryRoute, requestInit).then(response => response.text()).then(json => {
@@ -65,46 +81,139 @@ export class AutoComplete
 			const suggestions = summary.map(([id, caption]) => ({ caption, id: +id }))
 				.filter(item => item.caption.toLowerCase().startsWith(startsWith))
 			this.suggestions.update(suggestions)
-			const suggestion = this.suggestions.first()
-			if (!suggestion) {
-				delete input.selectedValue
-				if (this.idInput) this.idInput.value = ''
-				return
+			if (!['Backspace', 'Delete'].includes(lastKey)) {
+				this.autoComplete()
 			}
-			const caption = suggestion.caption
-			input.selectedValue = caption
-			if (this.idInput) this.idInput.value = '' + suggestion.id
-			const position = input.value.length
-			input.setRangeText(caption.slice(position))
-			input.setSelectionRange(position, input.value.length)
+			this.onInputValueChange()
+			this.autoIdInputValue()
 		})
+	}
+
+	initIdInput()
+	{
+		const input = this.input
+		const next  = input.nextElementSibling
+		const prev  = input.previousElementSibling
+		return ((next instanceof HTMLInputElement) && (next.type === 'hidden')) ? next
+			: ((prev instanceof HTMLInputElement) && (prev.type === 'hidden')) ? prev
+			: undefined
+	}
+
+	initInput(input: HTMLInputElement)
+	{
+		input.dataset.lastValue = input.value
+		return input
+	}
+
+	keyDown(event: KeyboardEvent)
+	{
+		const suggestions = this.suggestions
+		if (suggestions.isLastSelected()) {
+			return
+		}
+		event.preventDefault()
+		if (!suggestions.isVisible()) {
+			suggestions.show()
+			return
+		}
+		this.suggest(suggestions.selectNext()?.caption)
+	}
+
+	keyEnter(event: KeyboardEvent)
+	{
+		const suggestions = this.suggestions
+		if (!suggestions.isVisible()) {
+			return
+		}
+		event.preventDefault()
+		const suggestion = suggestions.selected()
+		if (!suggestion) {
+			return
+		}
+		this.input.value = suggestion.caption
+		this.onInputValueChange()
+		this.autoIdInputValue()
+		suggestions.hide()
+	}
+
+	keyEscape(event: KeyboardEvent)
+	{
+		const suggestions = this.suggestions
+		if ((this.input.value === '') && !suggestions.isVisible()) {
+			return
+		}
+		event.preventDefault()
+		if (suggestions.isVisible()) {
+			suggestions.hide()
+			return
+		}
+		this.input.value = ''
+		this.onInputValueChange()
+		this.autoIdInputValue()
+	}
+
+	keyUp(event: KeyboardEvent)
+	{
+		const suggestions = this.suggestions
+		if (!suggestions.isVisible()) {
+			return
+		}
+		event.preventDefault()
+		if (suggestions.isFirstSelected()) {
+			suggestions.hide()
+			return
+		}
+		this.suggest(suggestions.selectPrevious()?.caption)
 	}
 
 	onBlur(_event: FocusEvent)
 	{
-		const input = this.input
-		if (!input.selectedValue) return
-		input.value = input.selectedValue
-	}
-
-	onKeyDown(event: KeyboardEvent)
-	{
-		switch (event.key) {
-			case 'ArrowDown':
-			case 'Down':
-				return this.suggestions.show()
-			case 'ArrowUp':
-			case 'Up':
-				return this.suggestions.hide()
-		}
+		setTimeout(() => this.suggestions.removeList())
 	}
 
 	onInput(_event: Event)
 	{
-		if (this.input.lastValue === this.input.value) {
+		if (this.input.dataset.lastValue === this.input.value) {
 			return
 		}
 		this.fetch()
+	}
+
+	onInputValueChange()
+	{
+		this.input.dataset.lastValue = this.input.value
+		this.autoEmptyClass()
+	}
+
+	onKeyDown(event: KeyboardEvent)
+	{
+		this.lastKey = event.key
+		switch (event.key) {
+			case 'ArrowDown':
+			case 'Down':
+				return this.keyDown(event)
+			case 'ArrowUp':
+			case 'Up':
+				return this.keyUp(event)
+			case 'Escape':
+				return this.keyEscape(event)
+			case 'Enter':
+				return this.keyEnter(event)
+		}
+	}
+
+	suggest(value?: string)
+	{
+		if (typeof value !== 'string') {
+			return
+		}
+		const input    = this.input
+		const position = input.selectionStart
+		input.value    = value
+		input.setSelectionRange(position, input.value.length)
+		this.autoComplete()
+		this.onInputValueChange()
+		this.autoIdInputValue()
 	}
 
 }
@@ -112,43 +221,130 @@ export class AutoComplete
 class Suggestions
 {
 
-	list: HTMLUListElement
+	list?: HTMLUListElement
 
 	constructor(public combo: AutoComplete)
+	{}
+
+	createList()
 	{
 		const list = this.list = document.createElement('ul')
 		list.classList.add('suggestions')
-		list.style.display = 'none'
-		combo.input.insertAdjacentElement('afterend', list)
+		let   input: HTMLInputElement = this.combo.input
+		const idInput                 = input.nextElementSibling
+		if ((idInput instanceof HTMLInputElement) && (idInput.type === 'hidden')) {
+			input = idInput
+		}
+		input.insertAdjacentElement('afterend', list)
+		return list
 	}
 
-	first(): { caption: string, id: number }
+	first(): Item | null
 	{
-		const item = this.list.firstElementChild as HTMLLIElement
-		return { caption: item.innerText, id: +(item.dataset.id ?? 0) }
+		const item = this.list?.firstElementChild as HTMLLIElement ?? null
+		return item && { caption: item.innerText, id: +(item.dataset.id ?? 0) }
 	}
 
 	hide()
 	{
-		this.list.style.display = 'none'
+		const list = this.list
+		if (!list) return
+		list.style.display = 'none'
+	}
+
+	isFirstSelected()
+	{
+		return this.list
+			&& this.list.firstElementChild
+			&& (this.list.firstElementChild === this.list.querySelector('li.selected'))
+	}
+
+	isLastSelected()
+	{
+		return this.list
+			&& this.list.lastElementChild
+			&& (this.list.lastElementChild === this.list.querySelector('li.selected'))
+	}
+
+	isVisible()
+	{
+		return this.list && (this.list.style.display !== 'none')
+	}
+
+	removeList()
+	{
+		this.list?.remove()
+		this.list = undefined
+	}
+
+	selected(item: HTMLLIElement | null = null): Item | null
+	{
+		item ??= this.list?.querySelector<HTMLLIElement>('li.selected') ?? null
+		return item && { caption: item.innerText, id: +(item.dataset.id ?? 0) }
+	}
+
+	selectFirst()
+	{
+		const list = this.list
+		if (!list) return
+		list.querySelector('li.selected')?.classList.remove('selected')
+		list.firstElementChild?.classList.add('selected')
+	}
+
+	selectNext()
+	{
+		return this.selected(this.selectSibling('nextElementSibling'))
+	}
+
+	selectPrevious()
+	{
+		return this.selected(this.selectSibling('previousElementSibling'))
+	}
+
+	selectSibling(sibling: 'nextElementSibling' | 'previousElementSibling')
+	{
+		const list = this.list
+		if (!list) return null
+		let item = list.querySelector<HTMLLIElement>('li.selected')
+		if (item && item[sibling]) {
+			item.classList.remove('selected')
+			item = item[sibling] as HTMLLIElement
+			item.classList.add('selected')
+		}
+		return item
 	}
 
 	show()
 	{
-		this.list.style.removeProperty('display')
+		if (this.list) {
+			this.list.style.removeProperty('display')
+			return this.list
+		}
+		return this.createList()
 	}
 
-	update(suggestions: { caption: string, id: number }[])
+	update(suggestions: Item[])
 	{
-		const list     = this.list
-		list.innerHTML = ''
+		if (!suggestions.length) {
+			return this.hide()
+		}
+		let   hasSelected = false
+		const list        = this.show()
+		const selected    = list.querySelector<HTMLLIElement>('li.selected')?.innerText
+		list.innerHTML    = ''
 		for (const suggestion of suggestions) {
 			const item      = document.createElement('li')
 			item.dataset.id = '' + suggestion.id
 			item.innerText  = suggestion.caption
+			if (suggestion.caption === selected) {
+				hasSelected = true
+				item.classList.add('selected')
+			}
 			list.appendChild(item)
 		}
-		list.firstElementChild?.classList.add('selected')
+		if (!hasSelected) {
+			list.firstElementChild?.classList.add('selected')
+		}
 	}
 
 }

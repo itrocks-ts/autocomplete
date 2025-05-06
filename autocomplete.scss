@@ -1,0 +1,34 @@
+
+.combobox {
+
+	input[data-type=object] {
+		display: block;
+	}
+
+	.suggestions {
+		background: white;
+		box-sizing: border-box;
+		border: 1px solid #ddd;
+		margin-top: -1px;
+		padding: 0;
+		position: absolute;
+
+		> * {
+			cursor: pointer;
+			list-style: none;
+			padding: .5em 1em;
+
+			&:hover {
+				background: #efe;
+			}
+
+			&.selected {
+				background: #edf;
+			}
+
+			&.selected:hover {
+				background: #dce;
+			}
+		}
+	}
+}
