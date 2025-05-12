@@ -13,6 +13,11 @@
 		padding: 0;
 		position: absolute;
 
+		&:empty {
+			height: 2em;
+			width: 50px;
+		}
+
 		> * {
 			cursor: pointer;
 			list-style: none;

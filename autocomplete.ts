@@ -108,12 +108,15 @@ export class AutoComplete
 	keyDown(event: KeyboardEvent)
 	{
 		const suggestions = this.suggestions
-		if (suggestions.isLastSelected()) {
+		if (!suggestions.isVisible()) {
+			if (suggestions.length > 1) {
+				event.preventDefault()
+				suggestions.show()
+			}
 			return
 		}
 		event.preventDefault()
-		if (!suggestions.isVisible()) {
-			suggestions.show()
+		if (suggestions.isLastSelected()) {
 			return
 		}
 		this.suggest(suggestions.selectNext()?.caption)
@@ -221,6 +224,8 @@ export class AutoComplete
 class Suggestions
 {
 
+	length = 0
+
 	list?: HTMLUListElement
 
 	constructor(public combo: AutoComplete)
@@ -325,13 +330,11 @@ class Suggestions
 
 	update(suggestions: Item[])
 	{
-		if (!suggestions.length) {
-			return this.hide()
-		}
 		let   hasSelected = false
-		const list        = this.show()
+		const list        = this.list ?? this.createList()
 		const selected    = list.querySelector<HTMLLIElement>('li.selected')?.innerText
 		list.innerHTML    = ''
+		this.length = suggestions.length
 		for (const suggestion of suggestions) {
 			const item      = document.createElement('li')
 			item.dataset.id = '' + suggestion.id
@@ -344,6 +347,12 @@ class Suggestions
 		}
 		if (!hasSelected) {
 			list.firstElementChild?.classList.add('selected')
+		}
+		if (this.length > 1) {
+			if (!this.isVisible()) this.show()
+		}
+		else {
+			if (this.isVisible()) this.hide()
 		}
 	}
 
