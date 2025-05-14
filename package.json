@@ -7,7 +7,7 @@
 	"devDependencies": {
 		"@types/node": "^22.9",
 		"sass": "^1.83",
-		"typescript": "5.6"
+		"typescript": "~5.8"
 	},
 	"files": [
 		"LICENSE",
@@ -40,5 +40,5 @@
 	},
 	"type": "module",
 	"types": "./autocomplete.d.ts",
-	"version": "0.0.3"
+	"version": "0.0.4"
 }
