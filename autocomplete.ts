@@ -15,8 +15,8 @@ export class AutoComplete
 
 	constructor(input: HTMLInputElement)
 	{
-		this.input      = this.initInput(input)
-		this.idInput    = this.initIdInput()
+		this.input       = this.initInput(input)
+		this.idInput     = this.initIdInput()
 		this.suggestions = new Suggestions(this)
 
 		input.addEventListener('blur',    event => this.onBlur(event))
