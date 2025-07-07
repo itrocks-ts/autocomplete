@@ -61,9 +61,9 @@ export class AutoComplete
 	{
 		const idInput = this.idInput
 		if (!idInput) return
-		const input = this.input
+		const input      = this.input
 		const suggestion = this.suggestions.selected()
-		idInput.value = (input.value === suggestion?.caption)
+		idInput.value    = (input.value === suggestion?.caption)
 			? '' + suggestion.id
 			: ''
 	}
@@ -185,6 +185,10 @@ export class AutoComplete
 	onInputValueChange()
 	{
 		this.input.dataset.lastValue = this.input.value
+		this.input.dispatchEvent(new Event('input', { bubbles: true }))
+		if (document.activeElement !== this.input) { {
+			this.input.dispatchEvent(new Event('change', { bubbles: true }))
+		}}
 		this.autoEmptyClass()
 	}
 
