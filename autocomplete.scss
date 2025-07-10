@@ -12,6 +12,7 @@
 		margin-top: -1px;
 		padding: 0;
 		position: absolute;
+		z-index: 1;
 
 		&:empty {
 			height: 2em;

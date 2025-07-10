@@ -74,12 +74,13 @@ export class AutoComplete
 		const dataFetch = input.dataset.fetch ?? input.closest<HTMLElement>('[data-fetch]')?.dataset.fetch
 		const lastKey   = this.lastKey
 		const requestInit: RequestInit = { headers: { Accept: 'application/json' } }
-		const summaryRoute = dataFetch + '?startsWith=' + input.value
+		const summaryRoute = dataFetch + (input.value ? ('?startsWith=' + input.value) : '')
 		fetch(summaryRoute, requestInit).then(response => response.text()).then(json => {
-			const summary:    [string, string][] = JSON.parse(json)
+			const summary     = (JSON.parse(json) as [string, string][]).map(([id, caption]) => ({ caption, id: +id }))
 			const startsWith  = input.value.toLowerCase()
-			const suggestions = summary.map(([id, caption]) => ({ caption, id: +id }))
-				.filter(item => item.caption.toLowerCase().startsWith(startsWith))
+			const suggestions = startsWith.length
+				? summary.filter(item => item.caption.toLowerCase().startsWith(startsWith))
+				: summary
 			this.suggestions.update(suggestions)
 			if (!['Backspace', 'Delete'].includes(lastKey)) {
 				this.autoComplete()
@@ -108,6 +109,9 @@ export class AutoComplete
 	keyDown(event: KeyboardEvent)
 	{
 		const suggestions = this.suggestions
+		if (!suggestions.length) {
+			this.fetch()
+		}
 		if (!suggestions.isVisible()) {
 			if (suggestions.length > 1) {
 				event.preventDefault()
@@ -174,11 +178,10 @@ export class AutoComplete
 		setTimeout(() => this.suggestions.removeList())
 	}
 
-	onInput(_event: Event)
+	onInput(event: Event)
 	{
-		if (this.input.dataset.lastValue === this.input.value) {
-			return
-		}
+		if (document.activeElement !== event.target) return
+		if (this.input.dataset.lastValue === this.input.value) return
 		this.fetch()
 	}
 
