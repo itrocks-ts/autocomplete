@@ -5,9 +5,9 @@
 	},
 	"description": "Editable combobox component featuring smart autocomplete from a list of id-caption pairs for it.rocks",
 	"devDependencies": {
-		"@types/node": "^22.9",
-		"sass": "^1.83",
-		"typescript": "~5.8"
+		"@types/node": "^24.10",
+		"sass": "^1.95",
+		"typescript": "~5.9"
 	},
 	"files": [
 		"LICENSE",
@@ -40,5 +40,5 @@
 	},
 	"type": "module",
 	"types": "./autocomplete.d.ts",
-	"version": "0.0.8"
+	"version": "0.0.9"
 }
