@@ -63,7 +63,7 @@ export class AutoComplete
 		if (!idInput) return
 		const input      = this.input
 		const suggestion = this.suggestions.selected()
-		idInput.value    = (input.value === suggestion?.caption)
+		idInput.value    = (suggestion && (toInsensitive(input.value) === toInsensitive(suggestion.caption)))
 			? '' + suggestion.id
 			: ''
 	}
@@ -77,9 +77,9 @@ export class AutoComplete
 		const summaryRoute = dataFetch + (input.value ? ('?startsWith=' + input.value) : '')
 		fetch(summaryRoute, requestInit).then(response => response.text()).then(json => {
 			const summary     = (JSON.parse(json) as [string, string][]).map(([id, caption]) => ({ caption, id: +id }))
-			const startsWith  = input.value.toLowerCase()
+			const startsWith  = toInsensitive(input.value)
 			const suggestions = startsWith.length
-				? summary.filter(item => item.caption.toLowerCase().startsWith(startsWith))
+				? summary.filter(item => toInsensitive(item.caption).startsWith(startsWith))
 				: summary
 			this.suggestions.update(suggestions)
 			if (!['Backspace', 'Delete'].includes(lastKey)) {
@@ -363,4 +363,9 @@ class Suggestions
 		}
 	}
 
+}
+
+function toInsensitive(text: string)
+{
+	return text.normalize('NFD').replace(/\p{M}+/gu, '').toLowerCase()
 }
