@@ -153,6 +153,7 @@ export class AutoComplete
 		if (!suggestions.isVisible()) return
 		event.preventDefault()
 		this.select()
+		suggestions.hide()
 	}
 
 	keyEscape(event: Event)
@@ -262,7 +263,6 @@ export class AutoComplete
 		this.input.value = suggestion.caption
 		this.onInputValueChange()
 		this.autoIdInputValue()
-		suggestions.hide()
 	}
 
 	suggest(value?: string)
@@ -290,7 +290,9 @@ class Suggestions
 
 	list?: HTMLUListElement
 
-	constructor(public combo: AutoComplete)
+	pointerStart?: { id: number, item: HTMLLIElement, x: number, y: number }
+
+	constructor(public autoComplete: AutoComplete)
 	{}
 
 	createList()
@@ -298,8 +300,11 @@ class Suggestions
 		if (DEBUG) console.log('createList()')
 		const list = this.list = document.createElement('ul')
 		list.classList.add('suggestions')
-		this.combo.input.insertAdjacentElement('afterend', list)
-		list.addEventListener('pointerdown', event => this.onPointerDown(event))
+		this.autoComplete.input.insertAdjacentElement('afterend', list)
+		list.addEventListener('pointerdown',   event => this.onPointerDown(event))
+		list.addEventListener('pointercancel', event => this.onPointerCancel(event))
+		list.addEventListener('pointermove',   event => this.onPointerMove(event))
+		list.addEventListener('pointerup',     event => this.onPointerUp(event))
 		return list
 	}
 
@@ -337,20 +342,46 @@ class Suggestions
 		return this.list && (this.list.style.display !== 'none')
 	}
 
-	onPointerDown(event: MouseEvent)
+	onPointerDown(event: PointerEvent)
 	{
 		if (DEBUG) console.log('onPointerDown()', event.button)
-		if (event.button !== 0) return
+		if ((event.pointerType === 'mouse') && (event.button !== 0)) return
 		if (!(event.target instanceof Element)) return
 		const item = event.target.closest<HTMLLIElement>('.suggestions > li')
 		const list = this.list
 		if (DEBUG) console.log('  item', item, 'list', list)
 		if (!item || !list) return
 		if (DEBUG) console.log('  select', item)
+		if (event.pointerType !== 'mouse') {
+			this.pointerStart = { id: event.pointerId, item, x: event.clientX, y: event.clientY }
+			return
+		}
 		this.unselect()
 		item.classList.add('selected')
-		this.combo.select()
-		event.preventDefault()
+		this.autoComplete.select()
+		this.pointerStart = undefined
+	}
+
+	onPointerCancel(_event: PointerEvent)
+	{
+		this.pointerStart = undefined
+	}
+
+	onPointerMove(event: PointerEvent)
+	{
+		if (!this.pointerStart || (event.pointerId !== this.pointerStart.id)) return
+		const distance = Math.abs(event.clientX - this.pointerStart.x) + Math.abs(event.clientY - this.pointerStart.y)
+		if (distance < 8) return
+		this.pointerStart = undefined
+	}
+
+	onPointerUp(event: PointerEvent)
+	{
+		if (!this.pointerStart || (event.pointerId !== this.pointerStart.id)) return
+		this.unselect()
+		this.pointerStart.item.classList.add('selected')
+		this.autoComplete.select()
+		this.pointerStart = undefined
 	}
 
 	removeList()
