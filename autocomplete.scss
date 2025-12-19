@@ -1,40 +1,32 @@
 
-.combobox {
+.autocomplete + .suggestions {
+	background: white;
+	border: 1px solid #ddd;
+	margin-top: -1px;
+	padding: 0;
+	position: absolute;
+	z-index: 1;
 
-	input[data-type=object] {
-		display: block;
+	&:empty {
+		height: 2em;
+		width: 50px;
 	}
 
-	.suggestions {
-		background: white;
-		border: 1px solid #ddd;
-		margin-top: -1px;
-		padding: 0;
-		position: absolute;
-		top: 100%;
-		z-index: 1;
+	> * {
+		cursor: pointer;
+		list-style: none;
+		padding: .5em 1em;
 
-		&:empty {
-			height: 2em;
-			width: 50px;
+		&:hover {
+			background: #efe;
 		}
 
-		> * {
-			cursor: pointer;
-			list-style: none;
-			padding: .5em 1em;
+		&.selected {
+			background: #edf;
+		}
 
-			&:hover {
-				background: #efe;
-			}
-
-			&.selected {
-				background: #edf;
-			}
-
-			&.selected:hover {
-				background: #dce;
-			}
+		&.selected:hover {
+			background: #dce;
 		}
 	}
 }

@@ -21,6 +21,7 @@ export class AutoComplete
 		this.input       = this.initInput(input)
 		this.idInput     = this.initIdInput()
 		this.suggestions = new Suggestions(this)
+		this.initParent()
 
 		input.addEventListener('blur',    event => this.onBlur(event))
 		input.addEventListener('keydown', event => this.onKeyDown(event))
@@ -88,7 +89,7 @@ export class AutoComplete
 			}
 			return
 		}
-		this.fetching = inputValue
+		this.fetching   = inputValue
 		const dataFetch = input.dataset.fetch ?? input.closest<HTMLElement>('[data-fetch]')?.dataset.fetch
 		const lastKey   = this.lastKey
 		const requestInit: RequestInit = { headers: { Accept: 'application/json' } }
@@ -127,6 +128,13 @@ export class AutoComplete
 	{
 		input.dataset.lastValue = input.value
 		return input
+	}
+
+	initParent()
+	{
+		const parent = this.input.parentElement
+		if (!parent) return
+		parent.style.position = 'relative'
 	}
 
 	keyDown(event: Event)
@@ -237,8 +245,9 @@ export class AutoComplete
 
 	select()
 	{
+		if (DEBUG) console.log('select()')
 		const suggestions = this.suggestions
-		const suggestion = suggestions.selected()
+		const suggestion  = suggestions.selected()
 		if (!suggestion) return
 		if (DEBUG) console.log('  input =', suggestion.caption)
 		this.input.value = suggestion.caption
@@ -277,30 +286,24 @@ class Suggestions
 
 	createList()
 	{
-		if (DEBUG) console.log('Suggestions.createList()')
+		if (DEBUG) console.log('createList()')
 		const list = this.list = document.createElement('ul')
 		list.classList.add('suggestions')
-		let   input   = this.combo.input
-		const idInput = input.nextElementSibling
-		if ((idInput instanceof HTMLInputElement) && (idInput.type === 'hidden')) {
-			input = idInput
-		}
-		input.insertAdjacentElement('afterend', list)
-		if (DEBUG) console.log('Suggestions.prepareClic')
+		this.combo.input.insertAdjacentElement('afterend', list)
 		list.addEventListener('pointerdown', event => this.onPointerDown(event))
 		return list
 	}
 
 	first(): Item | null
 	{
-		if (DEBUG) console.log('Suggestions.first()')
+		if (DEBUG) console.log('first()')
 		const item = this.list?.firstElementChild as HTMLLIElement ?? null
 		return item && { caption: item.innerText, id: +(item.dataset.id ?? 0) }
 	}
 
 	hide()
 	{
-		if (DEBUG) console.log('Suggestions.hide()')
+		if (DEBUG) console.log('hide()')
 		const list = this.list
 		if (!list) return
 		list.style.display = 'none'
@@ -327,7 +330,7 @@ class Suggestions
 
 	onPointerDown(event: MouseEvent)
 	{
-		if (DEBUG) console.log('Suggestions.onPointerDown()', event.button)
+		if (DEBUG) console.log('onPointerDown()', event.button)
 		if (event.button !== 0) return
 		if (!(event.target instanceof Element)) return
 		const item = event.target.closest<HTMLLIElement>('.suggestions > li')
@@ -343,7 +346,7 @@ class Suggestions
 
 	removeList()
 	{
-		if (DEBUG) console.log('Suggestions.removeList()')
+		if (DEBUG) console.log('removeList()')
 		if (!this.list) return
 		this.list.remove()
 		this.list = undefined
@@ -352,7 +355,7 @@ class Suggestions
 	selected(item: HTMLLIElement | null = null): Item | null
 	{
 		item ??= this.list?.querySelector<HTMLLIElement>('li.selected') ?? null
-		if (DEBUG) console.log('Suggestions.selected()', item && { caption: item.innerText, id: +(item.dataset.id ?? 0) })
+		if (DEBUG) console.log('selected()', item && { caption: item.innerText, id: +(item.dataset.id ?? 0) })
 		return item && { caption: item.innerText, id: +(item.dataset.id ?? 0) }
 	}
 
@@ -397,6 +400,9 @@ class Suggestions
 		if (DEBUG) console.log('show()')
 		if (this.list) {
 			this.list.style.removeProperty('display')
+			if (!this.list.getAttribute('style')?.length) {
+				this.list.removeAttribute('style')
+			}
 			return this.list
 		}
 		return this.createList()
@@ -404,6 +410,7 @@ class Suggestions
 
 	unselect(item = this.list?.querySelector<HTMLLIElement>('li.selected'))
 	{
+		if (DEBUG) console.log('unselect()')
 		if (!item) return
 		const classList = item.classList
 		if (!classList) return
