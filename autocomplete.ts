@@ -23,9 +23,10 @@ export class AutoComplete
 		this.suggestions = new Suggestions(this)
 		this.initParent()
 
-		input.addEventListener('blur',    event => this.onBlur(event))
-		input.addEventListener('keydown', event => this.onKeyDown(event))
-		input.addEventListener('input',   event => this.onInput(event))
+		input.addEventListener('blur',    event    => this.onBlur(event))
+		input.addEventListener('keydown', event    => this.onKeyDown(event))
+		input.addEventListener('input',   event    => this.onInput(event))
+		input.addEventListener('touchstart', event => this.onTouchStart(event))
 	}
 
 	autoComplete()
@@ -140,22 +141,9 @@ export class AutoComplete
 	keyDown(event: Event)
 	{
 		if (DEBUG) console.log('keyDown()')
-		const suggestions = this.suggestions
-		if (!suggestions.length) {
-			this.fetch()
-		}
-		if (!suggestions.isVisible()) {
-			if (suggestions.length > 1) {
-				event.preventDefault()
-				suggestions.show()
-			}
-			return
-		}
-		event.preventDefault()
-		if (suggestions.isLastSelected()) {
-			return
-		}
-		this.suggest(suggestions.selectNext()?.caption)
+		if (this.openSuggestions(event)) return
+		if (this.suggestions.isLastSelected()) return
+		this.suggest(this.suggestions.selectNext()?.caption)
 	}
 
 	keyEnter(event: Event)
@@ -241,6 +229,27 @@ export class AutoComplete
 			case 'Enter':
 				return this.keyEnter(event)
 		}
+	}
+
+	onTouchStart(event: Event)
+	{
+		this.openSuggestions(event)
+	}
+
+	openSuggestions(event: Event)
+	{
+		const suggestions = this.suggestions
+		if (!suggestions.length) {
+			this.fetch()
+		}
+		if (suggestions.isVisible()) {
+			return false
+		}
+		if ((suggestions.length > 1) || (!this.input.value.length && suggestions.length)) {
+			event.preventDefault()
+			suggestions.show()
+		}
+		return true
 	}
 
 	select()
@@ -348,6 +357,7 @@ class Suggestions
 	{
 		if (DEBUG) console.log('removeList()')
 		if (!this.list) return
+		this.length = 0
 		this.list.remove()
 		this.list = undefined
 	}
