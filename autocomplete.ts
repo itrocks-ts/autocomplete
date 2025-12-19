@@ -154,19 +154,9 @@ export class AutoComplete
 	{
 		if (DEBUG) console.log('keyEnter()')
 		const suggestions = this.suggestions
-		if (!suggestions.isVisible()) {
-			return
-		}
+		if (!suggestions.isVisible()) return
 		event.preventDefault()
-		const suggestion = suggestions.selected()
-		if (!suggestion) {
-			return
-		}
-		if (DEBUG) console.log('  input =', suggestion.caption)
-		this.input.value = suggestion.caption
-		this.onInputValueChange()
-		this.autoIdInputValue()
-		suggestions.hide()
+		this.select()
 	}
 
 	keyEscape(event: Event)
@@ -245,6 +235,18 @@ export class AutoComplete
 		}
 	}
 
+	select()
+	{
+		const suggestions = this.suggestions
+		const suggestion = suggestions.selected()
+		if (!suggestion) return
+		if (DEBUG) console.log('  input =', suggestion.caption)
+		this.input.value = suggestion.caption
+		this.onInputValueChange()
+		this.autoIdInputValue()
+		suggestions.hide()
+	}
+
 	suggest(value?: string)
 	{
 		if (DEBUG) console.log('suggest()', value)
@@ -285,7 +287,7 @@ class Suggestions
 		}
 		input.insertAdjacentElement('afterend', list)
 		if (DEBUG) console.log('Suggestions.prepareClic')
-		list.addEventListener('click', event => this.onClick(event))
+		list.addEventListener('pointerdown', event => this.onPointerDown(event))
 		return list
 	}
 
@@ -323,31 +325,28 @@ class Suggestions
 		return this.list && (this.list.style.display !== 'none')
 	}
 
-	onClick(event: MouseEvent)
+	onPointerDown(event: MouseEvent)
 	{
-		if (DEBUG) console.log('Suggestions.onClick()', event.button)
+		if (DEBUG) console.log('Suggestions.onPointerDown()', event.button)
 		if (event.button !== 0) return
 		if (!(event.target instanceof Element)) return
 		const item = event.target.closest<HTMLLIElement>('.suggestions > li')
 		const list = this.list
 		if (DEBUG) console.log('  item', item, 'list', list)
 		if (!item || !list) return
+		if (DEBUG) console.log('  select', item)
 		this.unselect()
 		item.classList.add('selected')
-		if (DEBUG) console.log('  selected', item)
-		this.combo.keyEnter(event)
+		this.combo.select()
+		event.preventDefault()
 	}
 
 	removeList()
 	{
 		if (DEBUG) console.log('Suggestions.removeList()')
-		setTimeout(() => this.hide(), 100)
-		setTimeout(() => {
-			if (DEBUG) console.log('  list.remove()')
-			if (!this.list || (this.list.style.display !== 'none')) return
-			this.list.remove()
-			this.list = undefined
-		}, 200)
+		if (!this.list) return
+		this.list.remove()
+		this.list = undefined
 	}
 
 	selected(item: HTMLLIElement | null = null): Item | null
