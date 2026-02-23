@@ -1,5 +1,6 @@
 
-const DEBUG = false
+
+const DEBUG = true
 
 export interface AutoCompleteOptions
 {
@@ -26,6 +27,7 @@ export class AutoComplete
 	lastItems:   Item[] = []
 	lastKey =    ''
 	lastStart =  ''
+	lastValue =  ''
 	options:     AutoCompleteOptions
 	suggestions: Suggestions
 
@@ -176,9 +178,12 @@ export class AutoComplete
 		const input = this.input
 		const next  = input.nextElementSibling
 		const prev  = input.previousElementSibling
-		return ((next instanceof HTMLInputElement) && (next.type === 'hidden')) ? next
+		const idInput = ((next instanceof HTMLInputElement) && (next.type === 'hidden')) ? next
 			: ((prev instanceof HTMLInputElement) && (prev.type === 'hidden')) ? prev
 			: undefined
+		if (!idInput) return undefined
+		idInput.dataset.lastValue = idInput.value
+		return idInput
 	}
 
 	initInput(input: HTMLInputElement)
@@ -215,9 +220,19 @@ export class AutoComplete
 	keyEscape(event: Event)
 	{
 		if (DEBUG) console.log('keyEscape')
+		const input       = this.input
 		const suggestions = this.suggestions
-		if ((this.input.value === '') && !suggestions.isVisible()) {
-			return
+		if ((input.value === '') && input.dataset.lastValue) {
+			input.value   = input.dataset.lastValue
+			const idInput = this.idInput
+			if (idInput?.dataset.lastValue) {
+				idInput.value = idInput.dataset.lastValue
+			}
+			input.setSelectionRange(0, input.value.length)
+			this.onInputValueChange()
+			if (!suggestions.isVisible()) {
+				return
+			}
 		}
 		event.preventDefault()
 		if (suggestions.isVisible()) {
@@ -272,14 +287,14 @@ export class AutoComplete
 	{
 		if (DEBUG) console.log('onInput()')
 		if (document.activeElement !== event.target) return
-		if (this.input.dataset.lastValue === this.input.value) return
+		if (this.lastValue === this.input.value) return
 		this.fetch(this.lastKey)
 	}
 
 	onInputValueChange()
 	{
 		if (DEBUG) console.log('onInputValueChange()')
-		this.input.dataset.lastValue = this.input.value
+		this.lastValue = this.input.value
 		this.input.dispatchEvent(new Event('input', { bubbles: true }))
 		if (document.activeElement !== this.input) { {
 			this.input.dispatchEvent(new Event('change', { bubbles: true }))
@@ -548,6 +563,7 @@ class Suggestions
 			if (!this.list.getAttribute('style')?.length) {
 				this.list.removeAttribute('style')
 			}
+			this.list.querySelector('li.selected')?.scrollIntoView({ block: 'nearest' })
 			return this.list
 		}
 		return this.createList()

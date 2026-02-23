@@ -40,5 +40,5 @@
 	},
 	"type": "module",
 	"types": "./autocomplete.d.ts",
-	"version": "0.1.10"
+	"version": "0.1.11"
 }
