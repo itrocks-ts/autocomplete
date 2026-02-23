@@ -226,6 +226,8 @@ export class AutoComplete
 		}
 		if (DEBUG) console.log('input.value =')
 		this.input.value = ''
+		this.lastStart   = ''
+		this.suggestions.removeList()
 		this.onInputValueChange()
 		this.autoIdInputValue()
 	}
