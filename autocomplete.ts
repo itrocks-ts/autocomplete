@@ -1,6 +1,17 @@
 
 const DEBUG = false
 
+export interface AutoCompleteOptions
+{
+	allowNew:       boolean
+	fetchAttribute: string
+}
+
+const defaultOptions: AutoCompleteOptions = {
+	allowNew:       false,
+	fetchAttribute: 'data-fetch'
+}
+
 interface Item
 {
 	caption: string
@@ -12,14 +23,18 @@ export class AutoComplete
 	fetching?:   string
 	idInput?:    HTMLInputElement
 	input:       HTMLInputElement
-	lastKey    = ''
+	lastItems:   Item[] = []
+	lastKey =    ''
+	lastStart =  ''
+	options:     AutoCompleteOptions
 	suggestions: Suggestions
 
-	constructor(input: HTMLInputElement)
+	constructor(input: HTMLInputElement, options: Partial<AutoCompleteOptions> = {})
 	{
-		if (DEBUG) console.log('new AutoComplete()', input)
+		if (DEBUG) console.log('new AutoComplete()', input, options)
 		this.input       = this.initInput(input)
 		this.idInput     = this.initIdInput()
+		this.options     = Object.assign(defaultOptions, options)
 		this.suggestions = new Suggestions(this)
 		this.initParent()
 
@@ -59,6 +74,7 @@ export class AutoComplete
 			classList.add('empty')
 			return
 		}
+		if (DEBUG) console.log('  - empty')
 		classList.remove('empty')
 		if (!classList.length) {
 			input.removeAttribute('class')
@@ -73,46 +89,86 @@ export class AutoComplete
 		const input      = this.input
 		const suggestion = this.suggestions.selected()
 		idInput.value = (suggestion && (toInsensitive(input.value) === toInsensitive(suggestion.caption)))
-			? '' + suggestion.id
+			? (suggestion.id ? ('' + suggestion.id) : '')
 			: ''
 		if (DEBUG) console.log('  idInput =', idInput.value)
 	}
 
-	fetch()
+	consumeSelectedChar(event: KeyboardEvent)
+	{
+		if (event.key.length !== 1) return false
+		if (event.ctrlKey || event.altKey || event.metaKey) return false
+		if (!this.lastItems[this.lastItems.length - 1]?.id) return false
+
+		const input = this.input
+		const start = input.selectionStart
+		const end   = input.selectionEnd
+
+		if ((start === null) || (end === null) || (start === end)) return false
+
+		const firstSelectedChar = input.value.slice(start, start + 1)
+
+		if (toInsensitive(event.key) !== toInsensitive(firstSelectedChar)) return false
+
+		if (DEBUG) console.log('consumeSelectedChar(' + event.key + ')')
+		event.preventDefault()
+		input.setSelectionRange(start + 1, input.value.length)
+		this.fetch(event.key)
+
+		return true
+	}
+
+	fetch(lastKey = '')
 	{
 		const input      = this.input
-		const inputValue = ((input.selectionStart !== null) && (input.selectionEnd === input.value.length))
+		const startsWith = ((input.selectionStart !== null) && (input.selectionEnd === input.value.length))
 			? input.value.slice(0, input.selectionStart)
 			: input.value
+		if (DEBUG) console.log('fetch() with lastStart =', this.lastStart)
+		if (this.lastStart.length && toInsensitive(startsWith).startsWith(this.lastStart) && !this.suggestions.partial) {
+			this.fetchDone(undefined, startsWith, lastKey)
+			return
+		}
+		this.lastStart = toInsensitive(startsWith)
 		if (this.fetching) {
-			if (inputValue !==this.fetching) {
-				setTimeout(() => this.fetch(), 50)
+			if (startsWith !== this.fetching) {
+				setTimeout(() => this.fetch(lastKey), 50)
 			}
 			return
 		}
-		this.fetching   = inputValue
-		const dataFetch = input.dataset.fetch ?? input.closest<HTMLElement>('[data-fetch]')?.dataset.fetch
-		const lastKey   = this.lastKey
+		this.fetching        = startsWith
+		const fetchAttribute = this.options.fetchAttribute
+		const dataFetch      = input.closest<HTMLElement>('[' + fetchAttribute + ']')?.getAttribute(fetchAttribute)
 		const requestInit: RequestInit = { headers: { Accept: 'application/json' } }
-		const summaryRoute = dataFetch + (inputValue ? ('?startsWith=' + inputValue) : '')
-		if (DEBUG) console.log('fetch()', 'startsWith=' + inputValue)
-		fetch(summaryRoute, requestInit).then(response => response.text()).then(json => {
-			this.fetching     = undefined
-			const summary     = (JSON.parse(json) as [string, string][]).map(([id, caption]) => ({ caption, id: +id }))
-			const startsWith  = toInsensitive(inputValue)
-			const suggestions = startsWith.length
-				? summary.filter(item => toInsensitive(item.caption).startsWith(startsWith))
-				: summary
-			this.suggestions.update(suggestions)
-			if (!['Backspace', 'Delete'].includes(lastKey)) {
-				this.autoComplete()
-			}
-			this.onInputValueChange()
-			this.autoIdInputValue()
-		}).catch(() => {
-			this.fetching = undefined
-			setTimeout(() => this.fetch(), 100)
-		})
+		const url = dataFetch + '?limit&startsWith=' + startsWith
+		if (DEBUG) console.log('fetch()', 'limit&startsWith=' + startsWith)
+		fetch(url, requestInit).then(response => response.text())
+			.then(json => this.fetchDone(
+				(JSON.parse(json) as [string, string][]).map(([id, caption]) => ({ caption, id: +id })),
+				startsWith,
+				lastKey
+			))
+			.catch(() => {
+				this.fetching = undefined
+				setTimeout(() => this.fetch(lastKey), 100)
+			})
+	}
+
+	fetchDone(items: Item[] | undefined, startsWith: string, lastKey: string)
+	{
+		if (items) {
+			this.lastItems = items
+		}
+		else {
+			items = this.lastItems
+		}
+		this.fetching = undefined
+		this.updateSuggestions(items, startsWith)
+		if (!['Backspace', 'Delete'].includes(lastKey)) {
+			this.autoComplete()
+		}
+		this.onInputValueChange()
+		this.autoIdInputValue()
 	}
 
 	initIdInput()
@@ -193,6 +249,11 @@ export class AutoComplete
 	{
 		if (DEBUG) console.log('onBlur()')
 		this.suggestions.removeList()
+		if (!this.options.allowNew && this.idInput && this.input.value && !this.idInput.value) {
+			this.input.value = ''
+			this.onInputValueChange()
+			this.autoIdInputValue()
+		}
 	}
 
 	onInput(event: Event)
@@ -200,7 +261,7 @@ export class AutoComplete
 		if (DEBUG) console.log('onInput()')
 		if (document.activeElement !== event.target) return
 		if (this.input.dataset.lastValue === this.input.value) return
-		this.fetch()
+		this.fetch(this.lastKey)
 	}
 
 	onInputValueChange()
@@ -216,8 +277,9 @@ export class AutoComplete
 
 	onKeyDown(event: KeyboardEvent)
 	{
-		if (DEBUG) console.log('onKeyDown()', event.key)
+		if (DEBUG) console.log('########## onKeyDown()', event.key)
 		this.lastKey = event.key
+		if (this.consumeSelectedChar(event)) return
 		switch (event.key) {
 			case 'ArrowDown':
 			case 'Down':
@@ -239,14 +301,18 @@ export class AutoComplete
 
 	openSuggestions(event: Event)
 	{
+		if (DEBUG) console.log('openSuggestions()')
 		const suggestions = this.suggestions
 		if (!suggestions.length) {
+			if (DEBUG) console.log('OS: no suggestions => fetch')
 			this.fetch()
 		}
 		if (suggestions.isVisible()) {
+			if (DEBUG) console.log('OS: isVisible is true => return')
 			return false
 		}
 		if ((suggestions.length > 1) || (!this.input.value.length && suggestions.length)) {
+			if (DEBUG) console.log('OS: has items => show')
 			event.preventDefault()
 			suggestions.show()
 		}
@@ -281,6 +347,15 @@ export class AutoComplete
 		this.autoIdInputValue()
 	}
 
+	updateSuggestions(items: Item[], startsWith = '')
+	{
+		startsWith = toInsensitive(startsWith)
+		const suggestions = startsWith.length
+			? items.filter(item => (item.caption === '...') || toInsensitive(item.caption).startsWith(startsWith))
+			: items
+		this.suggestions.update(suggestions)
+	}
+
 }
 
 class Suggestions
@@ -289,6 +364,8 @@ class Suggestions
 	length = 0
 
 	list?: HTMLUListElement
+
+	partial = false
 
 	pointerStart?: { id: number, item: HTMLLIElement, x: number, y: number }
 
@@ -360,6 +437,13 @@ class Suggestions
 		item.classList.add('selected')
 		this.autoComplete.select()
 		this.pointerStart = undefined
+
+		const input = this.autoComplete.input
+		if (DEBUG) console.log('down: focus+setSelectionRange', input.value)
+		setTimeout(() => {
+			input.focus()
+			input.setSelectionRange(0, input.value.length)
+		})
 	}
 
 	onPointerCancel(_event: PointerEvent)
@@ -382,6 +466,13 @@ class Suggestions
 		this.pointerStart.item.classList.add('selected')
 		this.autoComplete.select()
 		this.pointerStart = undefined
+
+		const input = this.autoComplete.input
+		if (DEBUG) console.log('up: focus+setSelectionRange', input.value)
+		setTimeout(() => {
+			input.focus()
+			input.setSelectionRange(0, input.value.length)
+		})
 	}
 
 	removeList()
@@ -397,7 +488,7 @@ class Suggestions
 	{
 		item ??= this.list?.querySelector<HTMLLIElement>('li.selected') ?? null
 		if (DEBUG) console.log('selected()', item && { caption: item.innerText, id: +(item.dataset.id ?? 0) })
-		return item && { caption: item.innerText, id: +(item.dataset.id ?? 0) }
+		return item && { caption: item.innerText === '...' ? '' : item.innerText, id: +(item.dataset.id ?? 0) }
 	}
 
 	selectFirst()
@@ -431,6 +522,7 @@ class Suggestions
 			this.unselect(item)
 			item = item[sibling] as HTMLLIElement
 			item.classList.add('selected')
+			item.scrollIntoView({ block: 'nearest' })
 		}
 		if (DEBUG) console.log(' ', item)
 		return item
@@ -463,12 +555,13 @@ class Suggestions
 
 	update(suggestions: Item[])
 	{
-		if (DEBUG) console.log('update()')
+		if (DEBUG) console.log('update()', suggestions)
 		let   hasSelected = false
 		const list        = this.list ?? this.createList()
 		const selected    = list.querySelector<HTMLLIElement>('li.selected')?.innerText
 		list.innerHTML    = ''
 		this.length       = suggestions.length
+		this.partial      = false
 		for (const suggestion of suggestions) {
 			const item      = document.createElement('li')
 			item.dataset.id = '' + suggestion.id
@@ -478,7 +571,12 @@ class Suggestions
 				item.classList.add('selected')
 			}
 			list.appendChild(item)
+			if (!suggestion.id && (suggestion.caption === '...')) {
+				this.partial = true
+			}
 		}
+		if (DEBUG) console.log('- length =', this.length)
+		if (DEBUG) console.log('- partial =', this.partial ? 'true' : 'false')
 		if (!hasSelected) {
 			list.firstElementChild?.classList.add('selected')
 		}
