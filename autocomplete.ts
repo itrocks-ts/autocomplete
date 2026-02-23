@@ -248,8 +248,18 @@ export class AutoComplete
 	onBlur(_event: Event)
 	{
 		if (DEBUG) console.log('onBlur()')
+		const suggestion = this.suggestions.selected()
 		this.suggestions.removeList()
-		if (!this.options.allowNew && this.idInput && this.input.value && !this.idInput.value) {
+		if (
+			suggestion
+			&& this.idInput?.value
+			&& (this.input.value !== suggestion.caption)
+			&& (toInsensitive(this.input.value) === toInsensitive(suggestion.caption))
+		) {
+			this.input.value = suggestion.caption
+			this.onInputValueChange()
+		}
+		else if (!this.options.allowNew && this.idInput && this.input.value && !this.idInput.value) {
 			this.input.value = ''
 			this.onInputValueChange()
 			this.autoIdInputValue()
