@@ -197,7 +197,7 @@ export class AutoComplete
 	keyDown(event: Event)
 	{
 		if (DEBUG) console.log('keyDown()')
-		if (this.openSuggestions(event)) return
+		if (this.openSuggestions(event, true)) return
 		if (this.suggestions.isLastSelected()) return
 		this.suggest(this.suggestions.selectNext()?.caption)
 	}
@@ -311,7 +311,7 @@ export class AutoComplete
 		this.openSuggestions(event)
 	}
 
-	openSuggestions(event: Event)
+	openSuggestions(event: Event, force = false)
 	{
 		if (DEBUG) console.log('openSuggestions()')
 		const suggestions = this.suggestions
@@ -323,7 +323,7 @@ export class AutoComplete
 			if (DEBUG) console.log('OS: isVisible is true => return')
 			return false
 		}
-		if ((suggestions.length > 1) || (!this.input.value.length && suggestions.length)) {
+		if (force || (suggestions.length > 1) || (!this.input.value.length && suggestions.length)) {
 			if (DEBUG) console.log('OS: has items => show')
 			event.preventDefault()
 			suggestions.show()
