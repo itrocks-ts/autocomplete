@@ -1,6 +1,5 @@
 
-
-const DEBUG = true
+const DEBUG = false
 
 export interface AutoCompleteOptions
 {
