@@ -403,6 +403,7 @@ class Suggestions
 		if (DEBUG) console.log('createList()')
 		const list = this.list = document.createElement('ul')
 		list.classList.add('suggestions')
+		list.setAttribute('tabindex', '-1')
 		this.autoComplete.input.insertAdjacentElement('afterend', list)
 		list.addEventListener('pointerdown',   event => this.onPointerDown(event))
 		list.addEventListener('pointercancel', event => this.onPointerCancel(event))
