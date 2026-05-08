@@ -1,12 +1,10 @@
 {
   "compilerOptions": {
-    "allowSyntheticDefaultImports": true,
     "declaration": true,
-    "lib": ["DOM", "ES2022"],
-    "module": "ESNext",
+    "forceConsistentCasingInFileNames": true,
+    "module": "esnext",
     "skipLibCheck": true,
     "strict": true,
-    "target": "ES2022"
-  },
-  "include": ["*.ts"]
+    "target": "es2022"
+  }
 }
